@@ -1,0 +1,42 @@
+riscv64-unknown-elf-gcc -Wall -Werror -O -fno-omit-frame-pointer -ggdb -DSOL_PGTBL -DLAB_PGTBL -MD -mcmodel=medany -ffreestanding -fno-common -nostdlib -mno-relax -I. -fno-stack-protector -fno-pie -no-pie   -c -o kernel/vm.o kernel/vm.c
+riscv64-unknown-elf-ld -z max-page-size=4096 -T kernel/kernel.ld -o kernel/kernel kernel/entry.o kernel/start.o kernel/console.o kernel/printf.o kernel/uart.o kernel/kalloc.o kernel/spinlock.o kernel/string.o kernel/main.o kernel/vm.o kernel/proc.o kernel/swtch.o kernel/trampoline.o kernel/trap.o kernel/syscall.o kernel/sysproc.o kernel/bio.o kernel/fs.o kernel/log.o kernel/sleeplock.o kernel/file.o kernel/pipe.o kernel/exec.o kernel/sysfile.o kernel/kernelvec.o kernel/plic.o kernel/virtio_disk.o kernel/vmcopyin.o kernel/stats.o kernel/sprintf.o 
+riscv64-unknown-elf-objdump -S kernel/kernel > kernel/kernel.asm
+riscv64-unknown-elf-objdump -t kernel/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$/d' > kernel/kernel.sym
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 3 -nographic -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+complete
+hart 1 starting
+complete
+hart 2 starting
+complete
+
+
+kernel pagetable
+..0: pte 0x0000000021fdc401 pa 0x0000000087f71000
+..2: pte 0x0000000021fdb001 pa 0x0000000087f6c000
+..255: pte 0x0000000021fcac01 pa 0x0000000087f2b000
+dst:0x0000003fffffddf0 , srcva:0x000000000000002b
+
+
+kernel pagetable
+..0: pte 0x0000000021fdc401 pa 0x0000000087f71000
+..2: pte 0x0000000021fdb001 pa 0x0000000087f6c000
+..255: pte 0x0000000021fcac01 pa 0x0000000087f2b000
+dst:0x0000003fffffddf0 , srcva:0x0000000000000033
+page table 0x0000000087f24000
+..0: pte 0x0000000021fc8001 pa 0x0000000087f20000
+..255: pte 0x0000000021fc8c01 pa 0x0000000087f23000
+
+
+kernel pagetable
+..0: pte 0x0000000021fdc401 pa 0x0000000087f71000
+..2: pte 0x0000000021fdb001 pa 0x0000000087f6c000
+..255: pte 0x0000000021fcac01 pa 0x0000000087f2b000
+dst:0x0000003fffffdeff , srcva:0x0000000000002ecf
+scause 0x000000000000000d
+sepc=0x0000000080000d98 stval=0x0000000000002ecf
+panic: kerneltrap
+QEMU: Terminated
+
