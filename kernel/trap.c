@@ -8,7 +8,7 @@
 
 struct spinlock tickslock;
 uint ticks;
-
+uint64 alarmframe[512];
 extern char trampoline[], uservec[], userret[];
 
 // in kernelvec.S, calls kerneltrap().
@@ -37,7 +37,6 @@ void
 usertrap(void)
 {
   int which_dev = 0;
-
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
@@ -76,6 +75,17 @@ usertrap(void)
   if(p->killed)
     exit(-1);
 
+  // passed ticks ++ if interval not zero 
+  if(which_dev == 2 && p->interval && p->alarming == 0 ){
+	if(p->passed == p->interval){
+		memmove(alarmframe,p->trapframe,PGSIZE);
+		p->trapframe->epc = p->fn;
+		p->passed = 0;
+		p->alarming = 1;
+	}else{
+		p->passed+=1;		
+	}
+  }
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
     yield();

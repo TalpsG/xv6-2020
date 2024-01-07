@@ -91,11 +91,14 @@ userret:
         # usertrapret() calls here.
         # a0: TRAPFRAME, in user page table.
         # a1: user page table, for satp.
+        # a2: whether if to call fn
+		# a3: fn
 
         # switch to the user page table.
         csrw satp, a1
         sfence.vma zero, zero
-
+		
+		
         # put the saved user a0 in sscratch, so we
         # can swap it with our a0 (TRAPFRAME) in the last step.
         ld t0, 112(a0)

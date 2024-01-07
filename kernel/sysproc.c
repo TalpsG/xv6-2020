@@ -48,7 +48,7 @@ sys_sbrk(void)
     return -1;
   addr = myproc()->sz;
   if(growproc(n) < 0)
-    return -1;
+	return -1;
   return addr;
 }
 
@@ -69,6 +69,7 @@ sys_sleep(void)
     }
     sleep(&ticks, &tickslock);
   }
+  backtrace();
   release(&tickslock);
   return 0;
 }
@@ -94,4 +95,35 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_sigalarm(void)
+{
+	struct proc *p = myproc();
+	int interval;
+	uint64 fn;
+	if(argint(0,&interval) < 0){
+		return -1;
+	}
+	if(argaddr(1,&fn) < 0){
+		return -1;
+	}
+	if(interval == 0 && fn == 0){
+		p->interval = 0;
+		p->fn = 0;
+	}else{
+		p->interval = interval;
+		p->fn = fn;
+	}
+	return 0;
+}
+uint64
+sys_sigreturn(void)
+{
+	struct proc *p = myproc();
+	extern uint64 alarmframe[];
+	memmove(p->trapframe,alarmframe,PGSIZE);
+	p->alarming = 0;
+	return 0;
 }
