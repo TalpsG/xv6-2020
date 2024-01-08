@@ -139,8 +139,10 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+  if(p->pagetable){
     proc_freepagetable(p->pagetable, p->sz);
+  }
+
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -334,8 +336,9 @@ exit(int status)
 {
   struct proc *p = myproc();
 
-  if(p == initproc)
-    panic("init exiting");
+  if(p == initproc){
+	panic("init exiting");
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

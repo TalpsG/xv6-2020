@@ -31,7 +31,6 @@ sparse_memory(char *s)
       exit(1);
     }
   }
-
   exit(0);
 }
 
@@ -69,7 +68,6 @@ sparse_memory_unmap(char *s)
       }
     }
   }
-
   exit(0);
 }
 

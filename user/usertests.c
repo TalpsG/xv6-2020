@@ -2395,6 +2395,7 @@ stacktest(char *s)
   
   pid = fork();
   if(pid == 0) {
+
     char *sp = (char *) r_sp();
     sp -= PGSIZE;
     // the *sp should cause a trap.
