@@ -387,12 +387,39 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
-  if(bn < NINDIRECT){
+  if(bn < NINDIRECT ){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
+    if((addr = a[bn]) == 0){
+      a[bn] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    return addr;
+  }
+  bn -= NINDIRECT;
+  if(bn < N2DIRECT){
+    if((addr = ip->addrs[NDIRECT+1]) == 0){
+      ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
+      // inaddr  是第一级的间接块
+    }
+    uint bnn = bn/NINDIRECT;
+    bp = bread(ip->dev,addr);
+    a = (uint*)bp->data;
+    // 找到inaddr对应的buf  a是buf的data的起始地址
+    // 拿到第一级的间接块的起始地址了，第一块的buf就可以释放了
+    if((addr = a[bnn]) == 0){
+      a[bnn] = addr = balloc(ip->dev);
+      // addr为第二级间接块的块号
+      log_write(bp);
+    }
+    brelse(bp);
+    bp = bread(ip->dev,addr);
+    a = (uint*)bp->data;
+    bn = bn % NINDIRECT;
     if((addr = a[bn]) == 0){
       a[bn] = addr = balloc(ip->dev);
       log_write(bp);
@@ -430,6 +457,30 @@ itrunc(struct inode *ip)
     brelse(bp);
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
+  }
+  if(ip->addrs[NDIRECT+1]){
+    bp = bread(ip->dev,ip->addrs[NDIRECT+1]);
+    a = (uint*)bp->data;
+    struct buf *bpp;
+    uint *aa;
+    // a 为 一级间接块起始地址
+    for(i=0;i<NINDIRECT;i++){
+      if(a[i]){
+        bpp = bread(ip->dev,a[i]);
+        aa = (uint*)bpp->data;
+        // aa 为二级间接块起始地址
+        for(j=0;j<NINDIRECT;j++){
+          if(aa[j]){
+            bfree(ip->dev,aa[j]);
+          }
+        }
+        brelse(bpp);
+        bfree(ip->dev,a[i]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev,ip->addrs[NDIRECT+1]);
+    ip->addrs[NDIRECT+1] = 0;
   }
 
   ip->size = 0;
