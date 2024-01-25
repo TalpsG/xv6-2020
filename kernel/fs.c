@@ -352,8 +352,8 @@ iput(struct inode *ip)
 
     acquire(&icache.lock);
   }
-
   ip->ref--;
+  //printf("ref : %d\n",ip->ref);
   release(&icache.lock);
 }
 

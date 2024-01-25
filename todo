@@ -1,0 +1,2 @@
+1.23：写完了bmap(其实还没有，bread的块都要brelse掉)
+1.24: ialloc 分配的磁盘上的inode,磁盘上的inode不够了

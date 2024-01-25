@@ -96,7 +96,6 @@ sys_close(void)
 {
   int fd;
   struct file *f;
-
   if(argfd(0, &fd, &f) < 0)
     return -1;
   myproc()->ofile[fd] = 0;
@@ -188,7 +187,6 @@ sys_unlink(void)
   struct dirent de;
   char name[DIRSIZ], path[MAXPATH];
   uint off;
-
   if(argstr(0, path, MAXPATH) < 0)
     return -1;
 
@@ -229,7 +227,6 @@ sys_unlink(void)
   iunlockput(ip);
 
   end_op();
-
   return 0;
 
 bad:
@@ -292,15 +289,16 @@ sys_open(void)
   struct inode *ip;
   int n;
 
-  if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
+  if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0){
     return -1;
+  }
 
   begin_op();
-
   if(omode & O_CREATE){
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
+      printf("inode create fail\n");
       return -1;
     }
   } else {
@@ -315,6 +313,38 @@ sys_open(void)
       return -1;
     }
   }
+  if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+    int depth = 1;
+    char target[MAXPATH];
+    int pos= 0;
+    while(ip->type == T_SYMLINK){
+      pos = 0;
+      while(1){
+        if(readi(ip,0,(uint64)(&target[pos]),pos,1)<0){
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        if(target[pos] == 0){
+          break;
+        }
+        pos++;
+      }
+      iunlockput(ip);
+      if((ip = namei(target)) == 0){
+        end_op();
+        return -1;
+      }
+      ilock(ip);
+      depth++;
+      if(depth > 10){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+    }
+  }
+
 
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
     iunlockput(ip);
@@ -344,7 +374,6 @@ sys_open(void)
   if((omode & O_TRUNC) && ip->type == T_FILE){
     itrunc(ip);
   }
-
   iunlock(ip);
   end_op();
 
@@ -482,5 +511,26 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+int
+sys_symlink(void)
+{
+  char path[MAXPATH],target[MAXPATH];
+  if(argstr(0,target,MAXPATH) <0 || argstr(1,path,MAXPATH) < 0){
+    return -1;
+  }
+  begin_op();
+  struct inode *ip ;
+  ip = create(path,T_SYMLINK,0,0);
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+  int n1;
+  n1 = strlen(target)+1;
+  writei(ip,0,(uint64)target,0,n1);
+  iunlockput(ip);
+  end_op();
   return 0;
 }
