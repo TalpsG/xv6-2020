@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -65,6 +66,53 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause()== 13){
+    struct proc *p = myproc();
+    struct inode *ip = 0 ;
+    uint64 va = PGROUNDDOWN(r_stval());
+    uint64 pa = (uint64)kalloc();
+    memset((void*)pa,0,PGSIZE);
+    if(pa == 0){
+      printf("no free page\n");
+      p->killed = 1;
+    }else{
+      int i;
+      for(i=0;i<20;i++){
+        if(p->vma[i].va <= va  && (p->vma[i].va + p->vma[i].length) > va){
+          uint64 prot = p->vma[i].prot ;
+          uint64 flags = PTE_V | PTE_U;
+          if(prot & PROT_READ){
+            flags = flags | PTE_R;
+          }
+          if(prot & PROT_WRITE){
+            flags = flags | PTE_W;
+          }
+          if(prot & PROT_EXEC){
+            flags = flags | PTE_X;
+          }
+          if(prot & PROT_NONE){
+            flags = PTE_V;
+          }
+          mappages(p->pagetable,va,PGSIZE,pa,flags);
+          ip = getinode(&p->vma[i]);
+          break;
+        }
+      }
+      //for(int j = 0;j<20;j++){
+        //printf("vma:%p j:%d va:%p length:%p f:%p\n",p->vma,j,p->vma[j].va,p->vma[j].length,p->vma[j].f);
+      //}
+      if(ip == 0){
+        p->killed  = 1;
+        kfree((void*)pa);
+        printf("va :%p not found\n",va);
+      }else{
+        ilock(ip);
+        readi(ip,1,va,va - p->vma[i].va,PGSIZE);
+        iunlock(ip);
+      }
+
+    }
+
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {

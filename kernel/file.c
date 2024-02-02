@@ -179,4 +179,7 @@ filewrite(struct file *f, uint64 addr, int n)
 
   return ret;
 }
-
+struct inode *
+getinode(struct VMA *p){
+  return p->f->ip;
+}

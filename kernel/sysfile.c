@@ -329,7 +329,6 @@ sys_open(void)
     end_op();
     return -1;
   }
-
   if(ip->type == T_DEVICE){
     f->type = FD_DEVICE;
     f->major = ip->major;
@@ -483,4 +482,106 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+uint64
+sys_munmap(void)
+{
+  uint64 addr,length;
+  argaddr(0,&addr);
+  argaddr(1,&length);
+  struct proc *p = myproc();
+  struct VMA *vp = 0;
+  for(int i=0;i<20;i++){
+    if(p->vma[i].va != 0 && addr >= p->vma[i].va && p->vma[i].va + p->vma[i].length >= addr){
+      vp = &p->vma[i];
+    }
+  }
+  if(vp == 0){
+    printf("vma not found\n");
+    return -1;
+  }
+  if(vp->length < length ){
+    printf("munmap length is bigger than vma,addr:%p,va:%p,val:%p,length:%p\n",addr,vp->va,vp->length,length);
+    return -1;
+  }
+  if(vp->length == length && vp->va == addr){
+    if(vp->flags & MAP_SHARED){
+      // write back 
+      struct inode *ip = vp->f->ip;
+      begin_op();
+      ilock(ip);
+      writei(ip,1,vp->va,0,length);
+      iunlock(ip);
+      end_op();
+    }
+    fileclose(vp->f);
+    //if vma is the last mem in this proc space
+    //release it and move p->sz to this vma start
+    if(p->sz == (addr+length)){
+      p->sz -= length;
+    }
+    memunmap(p->pagetable,vp->va,PGROUNDUP(length)/PGSIZE,1);
+    memset(vp,0,sizeof(struct VMA));
+    return 0;
+  }else {
+    if(vp->flags & MAP_SHARED){
+      struct inode *ip = vp->f->ip;
+      begin_op();
+      ilock(ip);
+      writei(ip,1,addr,addr-vp->va,length);
+      iunlock(ip);
+      end_op();
+    }
+    memunmap(p->pagetable,vp->va,PGROUNDDOWN(length)/PGSIZE,1);
+    if(addr+length == vp->va + vp->length){
+      vp->length = addr - vp->va;
+      if(p->sz == addr+length){
+        p->sz -= length;
+      }
+    }else{
+      vp->va = addr+length;
+      vp->length -= length;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+struct VMA vma[20];
+
+uint64
+sys_mmap(void)
+{
+  uint64 length,addr;
+  int prot,flags,fd;
+  struct file *f;
+  struct proc *p = myproc();
+  struct VMA *vp;
+  argaddr(0,&addr);
+  argaddr(1,&length);
+  argint(2,&prot);
+  argint(3,&flags);
+  argfd(4,&fd,&f);
+  int i;
+  if(f->writable == 0 && prot & PROT_WRITE && flags & MAP_SHARED){
+    return -1;
+  }
+  for(i=0;i<20;i++){
+    if(p->vma[i].va == 0){
+      //find empty vma
+      vp = &p->vma[i];
+      vp->va = PGROUNDUP(p->sz);
+      p->sz += length;
+      vp->length = length;
+      vp->flags = flags;
+      vp->prot = prot;
+      vp->f = f;
+      filedup(f);
+      idup(f->ip);
+      return vp->va;
+    }
+  }
+  printf("no empty vma\n");
+  return -1;
 }

@@ -133,7 +133,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  for(int i = 0;i< 20;i++){
+    memset(&p->vma[i],0,sizeof(struct VMA));
+  }
   return p;
 }
 
@@ -281,6 +283,17 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+  
+  // copy vma
+  for(int i=0;i<20;i++){
+    np->vma[i].va = p->vma[i].va;
+    np->vma[i].length = p->vma[i].length;
+    np->vma[i].flags = p->vma[i].flags;
+    np->vma[i].prot = p->vma[i].prot;
+    np->vma[i].f = p->vma[i].f;
+    if(np->vma[i].f)
+      filedup(np->vma[i].f);
+  }
 
   np->parent = p;
 

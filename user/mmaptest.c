@@ -210,6 +210,10 @@ mmap_test(void)
     err("open mmap1");
   if(write(fd1, "12345", 5) != 5)
     err("write mmap1");
+  int fd3;
+  if((fd3 = open("mmap1", O_RDWR)) < 0){
+    err("write fd3");
+  }
   char *p1 = mmap(0, PGSIZE, PROT_READ, MAP_PRIVATE, fd1, 0);
   if(p1 == MAP_FAILED)
     err("mmap mmap1");
@@ -221,6 +225,7 @@ mmap_test(void)
     err("open mmap2");
   if(write(fd2, "67890", 5) != 5)
     err("write mmap2");
+
   char *p2 = mmap(0, PGSIZE, PROT_READ, MAP_PRIVATE, fd2, 0);
   if(p2 == MAP_FAILED)
     err("mmap mmap2");
@@ -279,7 +284,6 @@ fork_test(void)
     munmap(p1, PGSIZE); // just the first page
     exit(0); // tell the parent that the mapping looks OK.
   }
-
   int status = -1;
   wait(&status);
 
